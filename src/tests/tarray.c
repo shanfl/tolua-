@@ -33,8 +33,9 @@ int main(void)
 		array.p[i] = p[i];
 		array.pp[i] = pp[i];
 	}
-
+	int top = lua_gettop(L);
 	luaopen_base(L);
+	int top1 = lua_gettop(L);
 	tolua_tarray_open(L);
 
 	luaL_dofile(L, "tarray.lua");

@@ -25,29 +25,47 @@
 /* Create metatable
 	* Create and register new metatable
 */
+
+/*
+int luaL_newmetatable (lua_State *L, const char *tname);
+If the registry already has the key tname, 
+		returns 0. 
+Otherwise, creates a new table to be used as a metatable for userdata, adds to this new table the pair __name = tname, adds to the registry the pair [tname] = new table, 
+	and returns 1.
+
+In both cases, the function pushes onto the stack the final value associated with tname in the registry.
+*/
 static int tolua_newmetatable(lua_State* L, char* name)
 {
 	int r = luaL_newmetatable(L, name);
 
 #ifdef LUA_VERSION_NUM /* only lua 5.1 */
 	if (r) {
-		lua_pushvalue(L, -1);
+		lua_pushvalue(L, -1);  // 并不是把-1放到栈中,而是把 statck[-1]的值放到栈中
 		lua_pushstring(L, name);
-		lua_settable(L, LUA_REGISTRYINDEX); /* reg[mt] = type_name */
+		lua_settable(L, LUA_REGISTRYINDEX); /* reg[metatable] = type_name */
 	};
 #endif
 
-	if (r)
-		tolua_classevents(L); /* set meta events */
+	if (r)  // 表示新增
+		tolua_classevents(L); /* set meta events 对新生成的元表 添加元方法*/  
 	lua_pop(L, 1);
 	return r;
 }
 
 /* Map super classes
 	* It sets 'name' as being also a 'base', mapping all super classes of 'base' in 'name'
+	* 
+	* R["tolua_super"][<name>] = {base = 1-boolean}
+	* 
+	*	R["tolua_super"][<typename>] = {"const typename" = 1}
+		for k,v in pairs(R["tolua_super"][<const typename>]) do 
+			R["tolua_super"][<typename>][k] = v
+		end 
 */
 static void mapsuper(lua_State* L, const char* name, const char* base)
 {
+	int top = lua_gettop(L);
 	/* push registry.super */
 	lua_pushstring(L, "tolua_super");
 	lua_rawget(L, LUA_REGISTRYINDEX);    /* stack: super */
@@ -62,7 +80,7 @@ static void mapsuper(lua_State* L, const char* name, const char* base)
 		lua_pushvalue(L, -2);                /* stack: super table mt table */
 		lua_rawset(L, -4);                   /* stack: super table */
 	}
-
+	int top1 = lua_gettop(L);
 	/* set base as super class */
 	lua_pushstring(L, base);
 	lua_pushboolean(L, 1);
@@ -121,6 +139,7 @@ static void set_ubox(lua_State* L) {
 
 /* Map inheritance
 	* It sets 'name' as derived from 'base' by setting 'base' as metatable of 'name'
+	* 通过设 'base' 为 'name'的元表
 */
 static void mapinheritance(lua_State* L, const char* name, const char* base)
 {
@@ -137,9 +156,17 @@ static void mapinheritance(lua_State* L, const char* name, const char* base)
 		};
 		luaL_getmetatable(L, "tolua_commonclass");
 	};
-
+	/*
+	if base == "" then	<name> ["tolua_ubox"] = {< > = {["__mode"]= "v"}}
+				
+	*/
 	set_ubox(L);
 
+	/*
+	if base == "" then <name> = {< > = <tolua_commonclass>} ; name 的元表 的元表 是 <tolua_commonclass>
+
+	<name> = {< > = <base>}
+	*/
 	lua_setmetatable(L, -2);
 	lua_pop(L, 1);
 }
@@ -290,6 +317,7 @@ TOLUA_API void tolua_open(lua_State* L)
 	int top = lua_gettop(L);
 	lua_pushstring(L, "tolua_opened");
 	lua_rawget(L, LUA_REGISTRYINDEX);
+	int top_1 = lua_gettop(L);
 	if (!lua_isboolean(L, -1))
 	{
 		lua_pushstring(L, "tolua_opened"); lua_pushboolean(L, 1); lua_rawset(L, LUA_REGISTRYINDEX);
@@ -302,7 +330,7 @@ TOLUA_API void tolua_open(lua_State* L)
 		lua_setmetatable(L, -2);   /* stack: string peers */
 		lua_rawset(L, LUA_REGISTRYINDEX);
 #endif
-
+		// LUA_REGISTRYINDEX["tolua_ubox"] = { __metatable = {"__mode" = "v"} }
 		/* create object ptr -> udata mapping table */
 		lua_pushstring(L, "tolua_ubox"); lua_newtable(L);
 		/* make weak value metatable for ubox table to allow userdata to be
@@ -311,21 +339,35 @@ TOLUA_API void tolua_open(lua_State* L)
 		lua_setmetatable(L, -2);  /* stack: string ubox */
 		lua_rawset(L, LUA_REGISTRYINDEX);
 
+		// LUA_REGISTRYINDEX["tolua_super"] = {}
 		lua_pushstring(L, "tolua_super"); lua_newtable(L); lua_rawset(L, LUA_REGISTRYINDEX);
+
+		// LUA_REGISTRYINDEX["tolua_gc"] = {}
 		lua_pushstring(L, "tolua_gc"); lua_newtable(L); lua_rawset(L, LUA_REGISTRYINDEX);
 
+		// LUA_REGISTRYINDEX["tolua_gc_event"] = class_gc_event , class_gc_event的upvalue = [{"tolua_gc"},{"tolua_super"}]
 		/* create gc_event closure */
 		lua_pushstring(L, "tolua_gc_event");
 		lua_pushstring(L, "tolua_gc");
 		lua_rawget(L, LUA_REGISTRYINDEX);
 		lua_pushstring(L, "tolua_super");
 		lua_rawget(L, LUA_REGISTRYINDEX);
-		lua_pushcclosure(L, class_gc_event, 2);
+		lua_pushcclosure(L, class_gc_event, 2);		//	[-n, +1, m]
 		lua_rawset(L, LUA_REGISTRYINDEX);
 
+		/*
+			LUA_REGISTRYINDEX["tolua_ubox"] = { __metatable = {"__mode" = "v"} }
+			LUA_REGISTRYINDEX["tolua_super"] = {}
+			LUA_REGISTRYINDEX["tolua_gc"] = {}
+			LUA_REGISTRYINDEX["tolua_gc_event"] = class_gc_event , class_gc_event的upvalue = [{"tolua_gc"},{"tolua_super"}]
+		*/
+		int topNow1 = lua_gettop(L);
 		tolua_newmetatable(L, "tolua_commonclass");
 
+		int topNow2 = lua_gettop(L);
+
 		tolua_module(L, NULL, 0);
+		int topNow3 = lua_gettop(L);
 		tolua_beginmodule(L, NULL);
 		tolua_module(L, "tolua", 0);
 		tolua_beginmodule(L, "tolua");
@@ -391,6 +433,8 @@ TOLUA_API int tolua_register_gc(lua_State* L, int lo)
 /* Register a usertype
 	* It creates the correspoding metatable in the registry, for both 'type' and 'const type'.
 	* It maps 'const type' as being also a 'type'
+	* 
+	* {"tolua_super"}[<type>] = {["const " + type] = 1}
 */
 TOLUA_API void tolua_usertype(lua_State* L, const char* type)
 {
@@ -405,6 +449,7 @@ TOLUA_API void tolua_usertype(lua_State* L, const char* type)
 
 /* Begin module
 	* It pushes the module (or class) table on the stack
+	* 将module表放到堆栈,如果module-name是空,则是_G表
 */
 TOLUA_API void tolua_beginmodule(lua_State* L, const char* name)
 {
@@ -450,7 +495,7 @@ TOLUA_API void tolua_module(lua_State* L, const char* name, int hasvar)
 		/* global table */
 		lua_pushvalue(L, LUA_GLOBALSINDEX);
 	}
-	if (hasvar)
+	if (hasvar)  // 如果module有变量,则需要给module增加元表,添加 _index __newIndex的方法
 	{
 		if (!tolua_ismodulemetatable(L))  /* check if it already has a module metatable */
 		{
@@ -528,8 +573,18 @@ TOLUA_API void tolua_cclass(lua_State* L, const char* lname, const char* name, c
 	strncat(cname, name, 120);
 	strncat(cbase, base, 120);
 
+	//base<-name<-cname  inheritance-chain
+	/*
+	* if base = "" 
+	* 	//  <name> = { < > = <tolua_commonclass> }
+	*	//  <name> ["tolua_ubox"] = {< > = {["__mode"]= "v"}}
+	* else 
+	*		<name> = { < > = <base> }
+	*/
+
 	mapinheritance(L, name, base);
 	mapinheritance(L, cname, name);
+
 
 	mapsuper(L, cname, cbase);
 	mapsuper(L, name, base);

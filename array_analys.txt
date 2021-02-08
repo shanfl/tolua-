@@ -1,0 +1,37 @@
+_R["tolua_ubox"] = { __metatable = {"__mode" = "v"} }
+_R["tolua_super"] = {}
+_R["tolua_gc"] = {}
+_R["tolua_gc_event"] = class_gc_event , class_gc_event的upvalue = [{"tolua_gc"},{"tolua_super"}]
+
+1  -----------------------------------------------------------------------------------------------------------
+tolua_reg_types(tolua_S);
+{
+	tolua_usertype(tolua_S, "Array");		// {"tolua_super"}[<Array>] = {["const Array"] = 1}
+	tolua_usertype(tolua_S, "Point");		// {"tolua_super"}[<Point>] = {["const Point"] = 1}
+}
+
+tolua_module(lua_State* L, const char* name, int hasvar)
+_G.<> => {__index = module_index_event,   __newindex = module_newindex_event }
+
+tolua_beginmodule(tolua_S, NULL);  -- 将模块的表放到栈顶,如果是空名字,则为_G
+tolua_cclass(tolua_S, "Point", "Point", "", NULL);
+
+
+mapinheritance(lua_State* L, const char* name, const char* base)
+								"Point"				""
+								
+	<"Point"> => <"Point">["tolua_ubox"] = {.mt = {"__mode"="v"}}
+	<"Point">.rt = <"tolua_commonclass">
+
+
+mapinheritance(lua_State* L, const char* name, const char* base)
+								"const Point"				"Point"
+								
+	<const Point>["tolua_ubox"] = <Point>["tolua_ubox"]	
+	<const Point>.rt = <Point>
+	
+	
+mapsuper(L, "const Point", "const");
+								
+
+
