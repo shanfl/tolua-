@@ -1,0 +1,1 @@
+ toluapp -o lua_tclass.cpp tclass.pkg

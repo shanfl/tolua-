@@ -32,6 +32,20 @@ mapinheritance(lua_State* L, const char* name, const char* base)
 	
 	
 mapsuper(L, "const Point", "const");
+			_R["tolua_super"] => _R["tolua_super"][<"const Point">] = {"const" = 1}
 								
 
+mapsuper(L, "Point", "");
+	_R["tolua_super"][<"Point">]  => _R["tolua_super"][<"Point">][""] = 1
 
+
+
+lua_pushstring(L, "Point");	
+"Point"
+
+push_collector(L, "Point", 0);
+<"Point">	
+
+
+luaL_getmetatable(L, name);
+lua_rawset(L, -3);              /* assign class metatable to module */  // need to understand

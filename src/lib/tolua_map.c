@@ -568,6 +568,7 @@ static void push_collector(lua_State* L, const char* type, lua_CFunction col) {
 */
 TOLUA_API void tolua_cclass(lua_State* L, const char* lname, const char* name, const char* base, lua_CFunction col)
 {
+	int top1 = lua_gettop(L);
 	char cname[128] = "const ";
 	char cbase[128] = "const ";
 	strncat(cname, name, 120);
@@ -599,9 +600,9 @@ TOLUA_API void tolua_cclass(lua_State* L, const char* lname, const char* name, c
 
 	lua_rawset(L,-3);
 	*/
-
+	int top2 = lua_gettop(L);
 	luaL_getmetatable(L, name);
-	lua_rawset(L, -3);              /* assign class metatable to module */
+	lua_rawset(L, -3);              /* assign class metatable to module */  // need to understand
 
 	/* now we also need to store the collector table for the const
 	   instances of the class */
