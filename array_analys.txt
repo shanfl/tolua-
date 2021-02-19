@@ -47,5 +47,7 @@ push_collector(L, "Point", 0);
 <"Point">	
 
 
-luaL_getmetatable(L, name);
+luaL_getmetatable(L, "Point");
 lua_rawset(L, -3);              /* assign class metatable to module */  // need to understand
+
+

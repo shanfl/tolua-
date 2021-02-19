@@ -1,7 +1,7 @@
 for i=1,10 do
  assert(a[i]==i)
 end
-
+--[[
 for i=2,10 do
  assert(p[i-1].y==p[i].x)
 end
@@ -35,3 +35,4 @@ for i=2,10 do
 end
 
 print("Array test OK")
+--]]
